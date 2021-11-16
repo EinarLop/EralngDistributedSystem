@@ -17,7 +17,7 @@ servidor(Datos) -> %Datos = socios
         {De, {elimina_socio, Quien}} ->
         De ! {servidor_tienda, ok},
             servidor(elimina_socio(Quien, Datos));
-        
+
       %Devuelve algo más
         {De, {consulta_socio, Quien}}->
             De ! {servidor_tienda, busca_socio(Quien, Datos)},
@@ -55,3 +55,7 @@ abre_tienda() ->
         spawn(?MODULE, servidor, [[]])). 
 
 
+%Error en validción cuando el nombre a agregar es igual 
+%Eliminar con menos de 2 elementos crash 
+%Checar si lista socios dunciona con cero socios 
+%Lista socios siempre requiere de un argumento
