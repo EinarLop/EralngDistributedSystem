@@ -1,7 +1,7 @@
 -module(cliente_socio).
 -export([consulta_socio/1,crea_socio/1, lista_socios/1, elimina_socio/1]).
 
-matriz() -> 'tienda@LAPTOP-MS8JD713'.
+matriz() -> 'tienda@MSI'.
 
 lista_socios(Quien) ->
     llama_banco({lista_socios, Quien}).
@@ -25,6 +25,6 @@ llama_banco(Mensaje) ->
         {servidor_tienda, Respuesta} ->
             monitor_node(Matriz, false),
             Respuesta;
-            {nodedown, Matriz} ->
-                'nodo caido'
+        {nodedown, Matriz} ->
+            'nodo caido'
     end.
