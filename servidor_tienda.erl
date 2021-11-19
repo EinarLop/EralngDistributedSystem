@@ -1,16 +1,16 @@
 -module(servidor_tienda).
--export([abre_tienda/0, servidor/1, busca_socio/2, crea_socio/2, lista_socios/2, elimina_socio/2]).
+-export([abre_tienda/0, pedido_ajustado/2, ajuste_compra/2, cierra_tienda/0, servidor/1, busca_socio/2, crea_socio/2, lista_socios/1, elimina_socio/2]).
 
 servidor(Datos) -> %Datos = socios
     receive
         %Devuelve ok
         {De, {crea_socio, Quien}} ->
-        De ! {servidor_tienda, ok},
-        servidor(crea_socio(Quien, Datos));
+            De ! {servidor_tienda, ok},
+            servidor(crea_socio(Quien, Datos));
 
         %Devuelve algo más
-        {De, {lista_socios, Quien}} ->
-        De ! {servidor_tienda, lista_socios(Quien, Datos)},
+        {De, {lista_socios}} ->
+        De ! {servidor_tienda, lista_socios(Datos)},
             servidor(Datos);
         
          %Devuelve ok
@@ -18,7 +18,7 @@ servidor(Datos) -> %Datos = socios
         De ! {servidor_tienda, ok},
             servidor(elimina_socio(Quien, Datos));
 
-      %Devuelve algo más
+        %Devuelve algo más
         {De, {consulta_socio, Quien}}->
             De ! {servidor_tienda, busca_socio(Quien, Datos)},
             servidor(Datos);
@@ -71,8 +71,33 @@ servidor(Datos) -> %Datos = socios
 
         {De, {lista_existencias}} ->
             De ! {servidor_tienda, lista_existencias(Datos)},
-            servidor(Datos)
+            servidor(Datos);
+
+        {De, {crea_pedido, Quien, Productos}} ->
+            De ! {servidor_tienda, {Quien, pedido_ajustado(Productos, Datos)}},
+            servidor(Datos);
+
+        {fin} -> trabajo_terminado
     end.
+
+pedido_ajustado(Productos, Datos) ->
+    Inventario = lista_existencias(Datos),
+    lists:map(fun(X) -> ajuste_compra(X, Inventario) end, Productos).
+
+ajuste_compra({Producto, Cantidad}, Inventario) ->
+    ExistenciaTupla = lists:keyfind(Producto, 1, Inventario),
+    {_, Existencia} = ExistenciaTupla, 
+    if
+        (Cantidad > Existencia) -> {Producto, Existencia};
+        true -> {Producto, Cantidad}
+    end.
+
+ajuste_existencia({Producto, Cantidad}, [Curr | Tail]) ->
+    case Curr of
+        {_, _} -> 
+            %ExistenciaTupla = lists:keyfind(Producto, 1, Datos),
+            {_, Existencia} = Curr,
+            [{Producto, Existencia - Cantidad} | ajuste_existencia(Tail)].
 
 busca_socio(Quien, [Quien|_])->
     Quien;
@@ -88,14 +113,17 @@ elimina_socio(Quien, Socios) ->
     
 
 
-lista_socios(Quien, [A|T])->
-    Quien, %No hace  nada 
-    [A|T].
+lista_socios([A | T])->
+    case A of
+        {_, _} -> lista_socios(T);
+        _ -> [A | lista_socios(T)]
+    end;
+lista_socios([]) -> [].
 
 crea_socio(Quien, Socios) ->
-    S = lists:member(Quien,Socios),
-    if not S ->
-        lists:append(Socios, [Quien])
+    case lists:member(Quien,Socios) of
+        false -> lists:append(Socios, [Quien]);
+        true -> Socios
     end.
 
 registra_producto(Producto, X, [{Producto, Cantidad}| T]) ->
@@ -122,17 +150,18 @@ lista_producto(Producto, [_ | T]) ->
 lista_producto(_, _) ->
     indefinido.
 
-
 lista_existencias([H | T]) -> 
-    [H | lista_existencias(T)];
-lista_existencias(_) ->
-    fin.
+    case H of
+        {_, _} -> [H | lista_existencias(T)];
+        _ -> lista_existencias(T) 
+    end;
+lista_existencias([]) -> [].
 
 abre_tienda() ->
     register(servidor_tienda, %Cambiar a tienda
-        spawn(?MODULE, servidor, [[]])). 
+        spawn(?MODULE, servidor, [[]])).
 
-%Error en validción cuando el nombre a agregar es igual 
-%Eliminar con menos de 2 elementos crash 
-%Checar si lista socios dunciona con cero socios 
-%Lista socios siempre requiere de un argumento
+cierra_tienda() ->
+    servidor_tienda ! {fin}.
+
+%Eliminar con menos de 2 elementos crash (creo que ya quedó, chequen)
